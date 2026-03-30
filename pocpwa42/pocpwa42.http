@@ -1,0 +1,6 @@
+@pocpwa42_HostAddress = http://localhost:5119
+
+GET {{pocpwa42_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

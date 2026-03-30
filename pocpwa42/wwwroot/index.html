@@ -1,0 +1,66 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>PWA PoC</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+</head>
+<body>
+    <div id="status">Инициализация...</div>
+    <button id="loginBtn" style="display:none" onclick="handleCertLogin()">Войти по сертификату</button>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCKNcKYcnafRE1h9CDxhY4K23zI4N7ur6g",
+            authDomain: "fullstack-demo-6f25b.firebaseapp.com",
+            projectId: "fullstack-demo-6f25b",
+            storageBucket: "fullstack-demo-6f25b.firebasestorage.app",
+            messagingSenderId: "48848355982",
+            appId: "1:48848355982:web:79874e9c872ea0bdfc7fdf"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const messaging = firebase.messaging();
+
+        async function initApp() {
+            // 1. Проверяем "прозрачный вход" (имитация Refresh Token/Cert)
+            let userId = localStorage.getItem('corp_user_id');
+
+            if (!userId) {
+                document.getElementById('status').innerText = "Требуется авторизация";
+                document.getElementById('loginBtn').style.display = "block";
+                return;
+            }
+
+            document.getElementById('status').innerText = `Добро пожаловать, ${userId}`;
+            await syncToken(userId);
+        }
+
+        async function handleCertLogin() {
+            // Имитация успешной проверки сертификата
+            const userId = "User42";
+            localStorage.setItem('corp_user_id', userId);
+            location.reload();
+        }
+
+        async function syncToken(userId) {
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    const token = await messaging.getToken({ vapidKey: 'BIDdSKJqtk3kUMuqAYFIzh1QCsDoQa6BsV-GU--qIGPePep6h__VtDGVAKm5sWURlxWj-tQZQX45TXzFiCIwjAE' });
+
+                    // Шлем ЛИЧНУЮ связку на сервер
+                    await fetch('/api/pwa/register', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ userId: userId, fcmToken: token })
+                    });
+                    console.log("Устройство привязано к пользователю:", userId);
+                }
+            } catch (err) { console.error("Ошибка синхронизации:", err); }
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
