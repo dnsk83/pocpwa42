@@ -14,7 +14,7 @@ if (FirebaseApp.DefaultInstance == null)
     FirebaseApp.Create(new AppOptions()
     {
         // Убедись, что файл лежит в корне проекта и включен в Docker
-        Credential = GoogleCredential.FromFile("firebase-key.json")
+        Credential = GoogleCredential.FromJson(Environment.GetEnvironmentVariable("FIREBASE_CONFIG_JSON"))
     });
 }
 
