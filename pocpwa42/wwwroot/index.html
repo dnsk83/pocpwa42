@@ -1,14 +1,101 @@
 ﻿<!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>PWA PoC</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA MVP</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+    <script src="https://unpkg.com"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            background: #f4f7f6;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            text-align: center;
+        }
+
+        .screen {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .big-text {
+            font-size: 48px;
+            color: #1a73e8;
+            margin-bottom: 20px;
+        }
+
+        .footer {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #ddd;
+        }
+
+        button {
+            padding: 15px;
+            margin: 5px;
+            border-radius: 8px;
+            border: none;
+            background: #1a73e8;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn-alt {
+            background: #5f6368;
+        }
+
+        input {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 18px;
+        }
+    </style>
 </head>
 <body>
-    <div id="status">Инициализация...</div>
-    <button id="loginBtn" style="display:none" onclick="handleCertLogin()">Войти по сертификату</button>
+    <div id="app" v-cloak>
+        <!-- ЭКРАН 1: ЛОГИН -->
+        <div v-if="screen === 'login'" class="screen">
+            <h1>Вход в систему</h1>
+            <input v-model="username" placeholder="Введите имя">
+            <button @click="handleLogin">ВОЙТИ</button>
+        </div>
+
+        <!-- ЭКРАН 2: ДОМАШНИЙ -->
+        <div v-if="screen === 'home'" class="screen">
+            <div class="big-text">Привет, {{ username }}!</div>
+            <div class="footer">
+                <button @click="screen = 'log'">ЛОГ ПУШЕЙ</button>
+                <button class="btn-alt" @click="handleLogout">ВЫЙТИ</button>
+            </div>
+        </div>
+
+        <!-- ЭКРАН 3: ЛОГ ПУШЕЙ -->
+        <div v-if="screen === 'log'" class="screen">
+            <h2>Последнее уведомление</h2>
+            <p style="font-size: 20px; background: #fff; padding: 20px; border-radius: 10px;">
+                {{ lastPush || 'Здесь будет текст последнего пуша' }}
+            </p>
+            <button @click="screen = 'home'">НАЗАД</button>
+        </div>
+    </div>
 
     <script>
         const firebaseConfig = {
@@ -22,45 +109,55 @@
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
 
-        async function initApp() {
-            // 1. Проверяем "прозрачный вход" (имитация Refresh Token/Cert)
-            let userId = localStorage.getItem('corp_user_id');
-
-            if (!userId) {
-                document.getElementById('status').innerText = "Требуется авторизация";
-                document.getElementById('loginBtn').style.display = "block";
-                return;
-            }
-
-            document.getElementById('status').innerText = `Добро пожаловать, ${userId}`;
-            await syncToken(userId);
-        }
-
-        async function handleCertLogin() {
-            // Имитация успешной проверки сертификата
-            const userId = "User42";
-            localStorage.setItem('corp_user_id', userId);
-            location.reload();
-        }
-
-        async function syncToken(userId) {
-            try {
-                const permission = await Notification.requestPermission();
-                if (permission === 'granted') {
-                    const token = await messaging.getToken({ vapidKey: 'BIDdSKJqtk3kUMuqAYFIzh1QCsDoQa6BsV-GU--qIGPePep6h__VtDGVAKm5sWURlxWj-tQZQX45TXzFiCIwjAE' });
-
-                    // Шлем ЛИЧНУЮ связку на сервер
-                    await fetch('/api/pwa/register', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ userId: userId, fcmToken: token })
-                    });
-                    console.log("Устройство привязано к пользователю:", userId);
+        const { createApp } = Vue;
+        createApp({
+            data() {
+                return {
+                    screen: 'login',
+                    username: '',
+                    lastPush: localStorage.getItem('last_push') || ''
                 }
-            } catch (err) { console.error("Ошибка синхронизации:", err); }
-        }
+            },
+            methods: {
+                async handleLogin() {
+                    if (!this.username) return alert("Введите имя");
+                    localStorage.setItem('corp_user_id', this.username);
+                    await this.subscribeToPush();
+                    this.screen = 'home';
+                },
+                async handleLogout() {
+                    // Отписываемся на сервере (опционально)
+                    localStorage.clear();
+                    this.username = '';
+                    this.screen = 'login';
+                },
+                async subscribeToPush() {
+                    const permission = await Notification.requestPermission();
+                    if (permission === 'granted') {
+                        const token = await messaging.getToken({ vapidKey: 'BIDdSKJqtk3kUMuqAYFIzh1QCsDoQa6BsV-GU--qIGPePep6h__VtDGVAKm5sWURlxWj-tQZQX45TXzFiCIwjAE' });
+                        await fetch('/api/pwa/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: this.username, fcmToken: token })
+                        });
+                    }
+                }
+            },
+            mounted() {
+                const savedUser = localStorage.getItem('corp_user_id');
+                if (savedUser) {
+                    this.username = savedUser;
+                    this.screen = 'home';
+                    this.subscribeToPush(); // Обновляем токен при каждом входе
+                }
 
-        initApp();
+                // Слушаем пуши в реальном времени
+                messaging.onMessage((payload) => {
+                    this.lastPush = payload.notification.body;
+                    localStorage.setItem('last_push', this.lastPush);
+                });
+            }
+        }).mount('#app');
     </script>
 </body>
 </html>
