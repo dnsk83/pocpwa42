@@ -162,6 +162,22 @@
                     this.lastPush = payload.notification.body;
                     localStorage.setItem('last_push', this.lastPush);
                 });
+
+                // 1. ПРОВЕРКА ПРИ СТАРТЕ (если открыли новую вкладку по клику)
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('screen') === 'log') {
+                    this.screen = 'log';
+                }
+
+                // 2. ПРОВЕРКА В РЕАЛЬНОМ ВРЕМЕНИ (если страница уже была открыта)
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.addEventListener('message', (event) => {
+                        if (event.data && event.data.action === 'navigate') {
+                            this.screen = event.data.screen; // Переключаем на 'log'
+                            this.fetchLastVisitor(); // Опционально: сразу обновляем данные
+                        }
+                    });
+                }
             }
         }).mount('#app');
     </script>

@@ -18,3 +18,28 @@ messaging.onBackgroundMessage((payload) => {
         icon: '/icon_active.png'
     });
 });
+
+self.addEventListener('notificationclick', function (event) {
+    event.notification.close();
+
+    // Добавляем параметр ?screen=log к адресу
+    const urlToOpen = new URL('/?screen=log', self.location.origin).href;
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then(function (clientList) {
+                // 1. Если вкладка уже открыта, переключаем фокус
+                for (let client of clientList) {
+                    if (client.url.indexOf(self.location.origin) !== -1 && 'focus' in client) {
+                        // Отправляем сообщение открытой странице, чтобы она переключила экран
+                        client.postMessage({ action: 'navigate', screen: 'log' });
+                        return client.focus();
+                    }
+                }
+                // 2. Если вкладок нет, открываем новую с параметром в URL
+                if (clients.openWindow) {
+                    return clients.openWindow(urlToOpen);
+                }
+            })
+    );
+});
