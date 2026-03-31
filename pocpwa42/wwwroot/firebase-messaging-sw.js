@@ -22,23 +22,32 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener('notificationclick', function (event) {
     event.notification.close();
 
-    // Берем текст пуша, который мы сохранили в объекте notification
-    const pushText = event.notification.body || "";
+    // Достаем текст, который мы положили в data выше
+    const pushText = event.notification.data.msg;
 
-    // Формируем URL с текстом пуша (закодированным), чтобы страница его подхватила
-    const urlToOpen = new URL('/?screen=log&msg=' + encodeURIComponent(pushText), self.location.origin).href;
+    // Формируем безопасный URL с параметрами
+    const targetUrl = new URL(`/?screen=log&msg=${encodeURIComponent(pushText)}`, self.location.origin).href;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true })
             .then(function (clientList) {
+                // Пытаемся найти уже открытую вкладку
                 for (let client of clientList) {
                     if (client.url.indexOf(self.location.origin) !== -1 && 'focus' in client) {
-                        // Если страница открыта, шлем ей текст напрямую
-                        client.postMessage({ action: 'navigate', screen: 'log', msg: pushText });
+                        // Шлем сообщение открытой странице
+                        client.postMessage({
+                            action: 'navigate',
+                            screen: 'log',
+                            msg: pushText
+                        });
                         return client.focus();
                     }
                 }
-                if (clients.openWindow) return clients.openWindow(urlToOpen);
+                // Если вкладок нет — открываем новую с параметрами в URL
+                if (clients.openWindow) {
+                    return clients.openWindow(targetUrl);
+                }
             })
     );
+
 });
