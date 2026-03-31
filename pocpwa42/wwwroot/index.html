@@ -150,31 +150,25 @@
                 }
             },
             mounted() {
-                const savedUser = localStorage.getItem('corp_user_id');
-                if (savedUser) {
-                    this.username = savedUser;
-                    this.screen = 'home';
-                    this.subscribeToPush(); // Обновляем токен при каждом входе
-                }
-
-                // Слушаем пуши в реальном времени
-                messaging.onMessage((payload) => {
-                    this.lastPush = payload.notification.body;
-                    localStorage.setItem('last_push', this.lastPush);
-                });
-
-                // 1. ПРОВЕРКА ПРИ СТАРТЕ (если открыли новую вкладку по клику)
                 const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('screen') === 'log') {
+                const msgFromUrl = urlParams.get('msg');
+
+                // 1. Если пришли по ссылке с параметром msg
+                if (msgFromUrl) {
+                    this.lastPush = msgFromUrl;
+                    localStorage.setItem('last_push', this.lastPush); // Сохраняем в лог
                     this.screen = 'log';
                 }
 
-                // 2. ПРОВЕРКА В РЕАЛЬНОМ ВРЕМЕНИ (если страница уже была открыта)
+                // 2. Если страница была открыта и воркер прислал сообщение
                 if ('serviceWorker' in navigator) {
                     navigator.serviceWorker.addEventListener('message', (event) => {
                         if (event.data && event.data.action === 'navigate') {
-                            this.screen = event.data.screen; // Переключаем на 'log'
-                            this.fetchLastVisitor(); // Опционально: сразу обновляем данные
+                            this.screen = event.data.screen;
+                            if (event.data.msg) {
+                                this.lastPush = event.data.msg;
+                                localStorage.setItem('last_push', this.lastPush);
+                            }
                         }
                     });
                 }
